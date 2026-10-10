@@ -1,9 +1,6 @@
 // Edit this file to change what the dashboard shows.
 //
-// Each site needs a name and one of:
-//   url:    the link itself (anyone can open it), or
-//   locked: a code made with lock.html (opens only with the password).
-//
+// Each site needs a name and a url.
 // Optional fields:
 //   description: one short line under the name
 //   icon:  card, plane, calendar, heart, home, chart, link, lock

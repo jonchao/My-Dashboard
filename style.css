@@ -86,7 +86,6 @@ body::before {
 }
 
 .wrap { max-width: 960px; margin: 0 auto; padding: 48px 16px 56px; }
-.wrap.narrow { max-width: 560px; }
 @media (min-width: 640px) { .wrap { padding: 88px 32px 72px; } }
 
 /* Header */
@@ -130,14 +129,6 @@ body::before {
   color: transparent;
 }
 .sub { color: var(--muted); margin: 0; max-width: 52ch; font-size: 16px; }
-.back {
-  display: inline-block;
-  margin-bottom: 20px;
-  color: var(--muted);
-  text-decoration: none;
-  font-size: 14px;
-}
-.back:hover { color: var(--text); }
 
 /* Small lock button that shows hidden links */
 .reveal {
@@ -156,9 +147,8 @@ body::before {
   cursor: pointer;
   transition: color .2s ease, transform .2s ease, box-shadow .2s ease;
 }
-.reveal[hidden] { display: none; }
 .reveal:hover { color: var(--text); transform: rotate(-8deg) scale(1.06); }
-.reveal[aria-pressed="true"] {
+.reveal.on {
   color: #fff;
   border-color: transparent;
   background: linear-gradient(135deg, var(--amber-1), var(--amber-2));
@@ -281,100 +271,61 @@ a.card:hover .go { transform: translate(2px, -2px); }
 
 svg { fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
 
-/* Dialog */
-dialog {
-  width: min(390px, calc(100vw - 32px));
-  padding: 26px;
-  border: 1px solid var(--card-border);
-  border-radius: 22px;
+/* Passcode box under the lock icon */
+.lockbox { position: relative; flex: none; }
+.passbox {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 10;
+  width: 264px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px;
   background: var(--dialog);
-  color: var(--text);
-  box-shadow: 0 30px 70px -24px rgba(13, 10, 28, .55);
-}
-dialog[open] { animation: pop .25s cubic-bezier(.2, .9, .3, 1.2); }
-@keyframes pop { from { opacity: 0; transform: translateY(8px) scale(.96); } }
-dialog::backdrop { background: rgba(13, 10, 28, .45); backdrop-filter: blur(4px); }
-dialog h2 { font: 700 23px/1.2 "Bricolage Grotesque", system-ui, sans-serif; margin: 16px 0 6px; }
-dialog .sub { font-size: 14px; margin-bottom: 20px; }
-.dialog-icon {
-  width: 48px; height: 48px; border-radius: 14px;
-  display: grid; place-items: center;
-  background: linear-gradient(135deg, var(--amber-1), var(--rose-2));
-  color: #fff;
-  box-shadow: 0 10px 22px -10px var(--rose-2);
-}
-.dialog-icon svg { width: 23px; height: 23px; stroke-width: 1.9; }
-.shake { animation: shake .32s ease; }
-@keyframes shake {
-  20%, 60% { transform: translateX(-6px); }
-  40%, 80% { transform: translateX(6px); }
-}
-
-/* Forms (lock page) */
-.panel {
-  margin-top: 32px;
-  padding: 24px;
-  background: var(--card);
   border: 1px solid var(--card-border);
-  border-radius: 20px;
-  box-shadow: var(--card-shadow);
-  backdrop-filter: blur(16px) saturate(140%);
-  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  border-radius: 16px;
+  box-shadow: 0 24px 50px -20px rgba(13, 10, 28, .45);
+  animation: pop .22s cubic-bezier(.2, .9, .3, 1.2);
+  transform-origin: top right;
 }
-.panel h2 { font: 700 21px/1.2 "Bricolage Grotesque", system-ui, sans-serif; margin: 0 0 6px; }
-.field { margin-bottom: 16px; }
-label { display: block; font-weight: 600; font-size: 13px; margin-bottom: 6px; }
-label .opt { font-weight: 400; color: var(--faint); margin-left: 4px; }
-.choice { border: 0; padding: 0; margin: 0 0 16px; }
-.choice legend { font-weight: 600; font-size: 13px; margin-bottom: 8px; padding: 0; }
-.choice label { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; font-weight: 500; font-size: 14px; margin-bottom: 8px; cursor: pointer; }
-.choice input { width: auto; margin: 0; accent-color: var(--focus); }
-.choice .opt { flex-basis: 100%; margin: 0 0 0 22px; font-size: 13px; }
-input, select {
-  width: 100%;
-  padding: 11px 12px;
+.passbox[hidden] { display: none; }
+@keyframes pop { from { opacity: 0; transform: translateY(-6px) scale(.96); } }
+.passbox input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
   font: inherit;
   font-size: 16px;
   color: var(--text);
   background: var(--input-bg);
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 10px;
 }
-input:focus, select:focus { outline: 2px solid var(--focus); outline-offset: 1px; border-color: transparent; }
-.error { color: var(--danger); font-size: 13px; min-height: 20px; margin: 8px 0 12px; }
-
-.actions { display: flex; gap: 10px; justify-content: flex-end; }
-.btn {
-  appearance: none;
+.passbox input:focus { outline: 2px solid var(--focus); outline-offset: 1px; border-color: transparent; }
+.passgo {
+  flex: none;
+  width: 44px;
+  display: grid;
+  place-items: center;
+  padding: 0;
   border: 0;
+  border-radius: 10px;
   background: var(--brand);
-  background-size: 140% 100%;
   color: #fff;
-  font: 600 15px/1 "Public Sans", system-ui, sans-serif;
-  padding: 13px 20px;
-  border-radius: 12px;
   cursor: pointer;
-  box-shadow: 0 10px 24px -12px #ec4899;
-  transition: background-position .3s ease, transform .15s ease;
 }
-.btn:hover { background-position: 100% 0; }
-.btn:active { transform: scale(.97); }
-.btn:disabled { opacity: .6; cursor: progress; }
-.btn.secondary { background: var(--chip); color: var(--text); border: 1px solid var(--line); box-shadow: none; }
-.btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-
-pre {
-  margin: 16px 0;
-  padding: 16px;
-  overflow-x: auto;
-  background: var(--input-bg);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  font: 500 12.5px/1.6 "JetBrains Mono", ui-monospace, monospace;
-  white-space: pre-wrap;
-  word-break: break-all;
+.passgo:disabled { opacity: .6; cursor: progress; }
+.passgo:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.passgo svg { width: 18px; height: 18px; stroke-width: 2.2; }
+.pass-error { flex-basis: 100%; margin: 0 2px; color: var(--danger); font-size: 13px; }
+.pass-error:empty { display: none; }
+.shake { animation: shake .32s ease; }
+@keyframes shake {
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
 }
-code { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .92em; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before { animation: none !important; transition: none !important; }

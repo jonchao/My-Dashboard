@@ -1,47 +1,29 @@
-// Shared by index.html and lock.html.
-
-// Locked links are encrypted with AES-GCM, using a key derived from the
-// password (PBKDF2-SHA256). Without the password the page source only
-// contains the scrambled code, never the link.
+// Hidden sites are encrypted with AES-GCM, using a key derived from the
+// passcode (PBKDF2-SHA256), by private/build-hidden.mjs. Without the
+// passcode the page only contains the scrambled code in hidden.js.
 const Vault = (() => {
-  const ITERATIONS = 400000;
-  const enc = new TextEncoder();
-  const dec = new TextDecoder();
-  const toB64 = (bytes) => btoa(String.fromCharCode(...bytes));
   const fromB64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 
-  async function deriveKey(password, salt, iterations, usage) {
-    const base = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveKey"]);
-    return crypto.subtle.deriveKey(
-      { name: "PBKDF2", salt, iterations, hash: "SHA-256" },
+  // Returns the original text, or null if the passcode is wrong.
+  async function unlock(code, passcode) {
+    const [version, iterations, salt, iv, ct] = String(code).split(".");
+    if (version !== "v1") throw new Error("Unrecognized hidden code");
+    const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(passcode), "PBKDF2", false, ["deriveKey"]);
+    const key = await crypto.subtle.deriveKey(
+      { name: "PBKDF2", salt: fromB64(salt), iterations: Number(iterations), hash: "SHA-256" },
       base,
       { name: "AES-GCM", length: 256 },
       false,
-      [usage]
+      ["decrypt"]
     );
-  }
-
-  async function lock(text, password) {
-    const salt = crypto.getRandomValues(new Uint8Array(16));
-    const iv = crypto.getRandomValues(new Uint8Array(12));
-    const key = await deriveKey(password, salt, ITERATIONS, "encrypt");
-    const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, enc.encode(text)));
-    return ["v1", ITERATIONS, toB64(salt), toB64(iv), toB64(ct)].join(".");
-  }
-
-  // Returns the original text, or null if the password is wrong.
-  async function unlock(code, password) {
-    const [version, iterations, salt, iv, ct] = String(code).split(".");
-    if (version !== "v1") throw new Error("Unrecognized locked code");
-    const key = await deriveKey(password, fromB64(salt), Number(iterations), "decrypt");
     try {
-      return dec.decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv: fromB64(iv) }, key, fromB64(ct)));
+      return new TextDecoder().decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv: fromB64(iv) }, key, fromB64(ct)));
     } catch {
       return null;
     }
   }
 
-  return { lock, unlock };
+  return { unlock };
 })();
 
 const ICONS = {
@@ -55,6 +37,7 @@ const ICONS = {
   lock: '<rect x="4.5" y="10.5" width="15" height="10" rx="2.5"/><path d="M8 10.5v-3a4 4 0 0 1 8 0v3"/>',
   unlock: '<rect x="4.5" y="10.5" width="15" height="10" rx="2.5"/><path d="M8 10.5v-3a4 4 0 0 1 7.75-1.4"/>',
   arrow: '<path d="M7 17 17 7M8.5 7H17v8.5"/>',
+  "arrow-right": '<path d="M5 12h14M13 6l6 6-6 6"/>',
 };
 
 const ICON_COLORS = {

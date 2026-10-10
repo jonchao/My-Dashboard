@@ -11,6 +11,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
 <link rel="stylesheet" href="style.css">
 <script src="sites.js"></script>
+<script src="hidden.js"></script>
 <script src="shared.js"></script>
 </head>
 <body>
@@ -21,39 +22,28 @@
       <h1 id="title">Launchpad</h1>
       <p class="sub" id="subtitle"></p>
     </div>
-    <button type="button" class="reveal" id="reveal" hidden></button>
+    <div class="lockbox">
+      <button type="button" class="reveal" id="reveal" aria-controls="passbox" aria-expanded="false"></button>
+      <form class="passbox" id="passbox" hidden>
+        <input id="passcode" type="password" placeholder="Passcode" aria-label="Passcode" autocomplete="current-password">
+        <button type="submit" class="passgo" id="passgo" aria-label="Unlock"></button>
+        <p class="pass-error" id="pass-error" role="alert"></p>
+      </form>
+    </div>
   </header>
   <ul class="grid" id="grid"></ul>
   <noscript><p class="sub">This page needs JavaScript to show its links.</p></noscript>
 </main>
 
-<dialog id="unlock" aria-labelledby="unlock-title">
-  <form id="unlock-form">
-    <div class="dialog-icon"></div>
-    <h2 id="unlock-title"></h2>
-    <p class="sub" id="unlock-sub"></p>
-    <label for="unlock-pw">Password</label>
-    <input id="unlock-pw" type="password" autocomplete="current-password" required>
-    <p class="error" id="unlock-error" role="alert"></p>
-    <div class="actions">
-      <button type="button" class="btn secondary" id="unlock-cancel">Cancel</button>
-      <button type="submit" class="btn" id="unlock-submit">Unlock</button>
-    </div>
-  </form>
-</dialog>
-
 <script>
 const cfg = Object.assign({ title: "Launchpad", subtitle: "", newTab: true, sites: [] }, window.DASHBOARD);
 const $ = (id) => document.getElementById(id);
-const dialog = $("unlock");
-let pending = null;      // the locked site whose password dialog is open, or "hidden"
-let showHidden = false;  // whether hidden links have been revealed
+let hiddenSites = []; // filled in once the passcode is entered
 
 document.title = cfg.title;
 $("title").textContent = cfg.title;
 $("subtitle").textContent = cfg.subtitle;
-document.querySelector(".dialog-icon").innerHTML = icon("lock");
-$("reveal").hidden = !cfg.sites.some((s) => s.hidden);
+$("passgo").innerHTML = icon("arrow-right");
 
 const now = new Date();
 const hour = now.getHours();
@@ -71,40 +61,29 @@ function shortUrl(url) {
 }
 
 function cardFor(site) {
-  const locked = Boolean(site.locked && !site.url);
-  const card = document.createElement(locked ? "button" : "a");
+  const card = document.createElement("a");
   const color = site.color || ICON_COLORS[site.icon] || "slate";
   card.className = "card";
+  card.href = site.url;
+  if (cfg.newTab) {
+    card.target = "_blank";
+    card.rel = "noopener";
+  }
   card.style.setProperty("--c1", `var(--${color}-1)`);
   card.style.setProperty("--c2", `var(--${color}-2)`);
-
-  if (locked) {
-    card.type = "button";
-    card.addEventListener("click", () => askPassword(site));
-  } else {
-    card.href = site.url;
-    if (cfg.newTab) {
-      card.target = "_blank";
-      card.rel = "noopener";
-    }
-  }
-
-  const badge = locked ? "Locked" : site.locked ? "Unlocked" : site.revealed ? "Hidden" : "";
   card.innerHTML = `
     <span class="icon">${icon(site.icon)}</span>
-    ${badge ? `<span class="badge">${icon(locked ? "lock" : "unlock")}${badge}</span>` : ""}
+    ${site.hidden ? `<span class="badge">${icon("unlock")}Hidden</span>` : ""}
     <span><span class="name"></span><span class="desc"></span></span>
-    <span class="foot"><span class="path"></span><span class="go">${icon(locked ? "lock" : "arrow")}</span></span>`;
+    <span class="foot"><span class="path"></span><span class="go">${icon("arrow")}</span></span>`;
   card.querySelector(".name").textContent = site.name;
   card.querySelector(".desc").textContent = site.description || "";
-  card.querySelector(".path").textContent = locked ? "Password required" : shortUrl(site.url);
+  card.querySelector(".path").textContent = shortUrl(site.url);
   return card;
 }
 
 function render() {
-  const shown = cfg.sites
-    .map((site) => (site.hidden ? (showHidden ? site.entry : null) : site))
-    .filter(Boolean);
+  const shown = [...cfg.sites, ...hiddenSites];
   $("grid").replaceChildren(...shown.map((site, i) => {
     const li = document.createElement("li");
     li.style.setProperty("--i", i);
@@ -112,110 +91,68 @@ function render() {
     return li;
   }));
 
+  const unlocked = hiddenSites.length > 0;
   const reveal = $("reveal");
-  reveal.innerHTML = icon(showHidden ? "unlock" : "lock");
-  reveal.title = showHidden ? "Hide hidden links" : "Show hidden links";
+  reveal.innerHTML = icon(unlocked ? "unlock" : "lock");
+  reveal.classList.toggle("on", unlocked);
+  reveal.title = unlocked ? "Hide hidden sites" : "Show hidden sites";
   reveal.setAttribute("aria-label", reveal.title);
-  reveal.setAttribute("aria-pressed", String(showHidden));
 }
 
-function openDialog(target, title, sub) {
-  pending = target;
-  $("unlock-title").textContent = title;
-  $("unlock-sub").textContent = sub;
-  $("unlock-error").textContent = "";
-  $("unlock-pw").value = "";
-  dialog.showModal();
-}
-
-function askPassword(site) {
-  openDialog(site, site.name, "Enter the password to open this site.");
+function setPassbox(open) {
+  $("passbox").hidden = !open;
+  $("reveal").setAttribute("aria-expanded", String(open));
+  $("pass-error").textContent = "";
+  $("passcode").value = "";
+  if (open) $("passcode").focus();
 }
 
 $("reveal").addEventListener("click", () => {
-  if (showHidden) {
-    // Hiding forgets the unlocked links, so showing them again needs the password.
-    showHidden = false;
-    for (const site of cfg.sites) delete site.entry;
+  if (hiddenSites.length) {
+    // Hiding forgets them, so showing them again needs the passcode.
+    hiddenSites = [];
     render();
   } else {
-    openDialog("hidden", "Hidden links", "Enter the password to show hidden links.");
+    setPassbox($("passbox").hidden);
   }
 });
 
-function go(url) {
-  if (!cfg.newTab) return location.assign(url);
-  const w = window.open(url, "_blank");
-  if (w) w.opener = null;
-  else location.assign(url); // pop-up blocked: open here instead
-}
-
-// Tries a password on every locked or hidden site, so sites that share a
-// password all open at once. Returns true if it opened anything.
-async function tryPassword(password) {
-  let opened = false;
-  for (const site of cfg.sites) {
-    if (site.locked && !site.url) {
-      const url = await Vault.unlock(site.locked, password).catch(() => null);
-      if (url) {
-        site.url = url;
-        opened = true;
-      }
-    } else if (site.hidden && !site.entry) {
-      const json = await Vault.unlock(site.hidden, password).catch(() => null);
-      if (json) {
-        site.entry = { ...JSON.parse(json), revealed: true };
-        opened = true;
-      }
-    }
-  }
-  return opened;
-}
-
-function rejectPassword() {
-  $("unlock-error").textContent = "That password didn't work. Try again.";
-  const form = $("unlock-form");
-  form.classList.remove("shake");
-  void form.offsetWidth;
-  form.classList.add("shake");
-  $("unlock-pw").select();
-}
-
-$("unlock-form").addEventListener("submit", async (e) => {
+$("passbox").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const password = $("unlock-pw").value;
-  const submit = $("unlock-submit");
-  const target = pending;
-  if (!password || !target) return;
+  const passcode = $("passcode").value;
+  if (!passcode) return;
 
-  submit.disabled = true;
-  submit.textContent = "Checking…";
-  let ok;
-  if (target === "hidden") {
-    ok = await tryPassword(password) && cfg.sites.some((s) => s.entry);
-    if (ok) showHidden = true;
-  } else {
-    // Open the clicked site first, before the browser forgets the click.
-    const url = await Vault.unlock(target.locked, password).catch(() => null);
-    ok = Boolean(url);
-    if (ok) {
-      target.url = url;
-      go(url);
-      await tryPassword(password);
-      if (cfg.sites.some((s) => s.entry)) showHidden = true;
-    }
+  $("passgo").disabled = true;
+  const json = window.HIDDEN_SITES
+    ? await Vault.unlock(window.HIDDEN_SITES, passcode).catch(() => null)
+    : null;
+  $("passgo").disabled = false;
+
+  if (!json) {
+    $("pass-error").textContent = "Wrong passcode";
+    const box = $("passbox");
+    box.classList.remove("shake");
+    void box.offsetWidth;
+    box.classList.add("shake");
+    $("passcode").select();
+    return;
   }
-  submit.disabled = false;
-  submit.textContent = "Unlock";
 
-  if (!ok) return rejectPassword();
-  dialog.close();
+  hiddenSites = JSON.parse(json).map((site) => ({ ...site, hidden: true }));
+  setPassbox(false);
   render();
 });
 
-$("unlock-cancel").addEventListener("click", () => dialog.close());
-dialog.addEventListener("click", (e) => { if (e.target === dialog) dialog.close(); });
-dialog.addEventListener("close", () => { pending = null; });
+// Close the passcode box on Escape or a click elsewhere.
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !$("passbox").hidden) {
+    setPassbox(false);
+    $("reveal").focus();
+  }
+});
+document.addEventListener("click", (e) => {
+  if (!$("passbox").hidden && !e.target.closest(".lockbox")) setPassbox(false);
+});
 
 render();
 </script>
