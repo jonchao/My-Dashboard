@@ -36,6 +36,11 @@
       <label for="icon">Icon</label>
       <select id="icon"></select>
     </div>
+    <fieldset class="field choice">
+      <legend>On the dashboard</legend>
+      <label><input type="radio" name="mode" value="hidden" checked> Hide it completely <span class="opt">nothing shows until the password is entered with the lock icon</span></label>
+      <label><input type="radio" name="mode" value="locked"> Show the card, lock the link <span class="opt">the name shows, the link needs the password</span></label>
+    </fieldset>
     <div class="field">
       <label for="pw">Password</label>
       <input id="pw" type="password" required autocomplete="new-password">
@@ -83,13 +88,17 @@ $("form").addEventListener("submit", async (e) => {
 
   $("make").disabled = true;
   $("make").textContent = "Locking…";
-  const code = await Vault.lock(url, pw);
+  const description = $("desc").value.trim() || undefined;
+  const hide = document.querySelector('input[name="mode"]:checked').value === "hidden";
+  // A hidden entry encrypts everything; a locked one encrypts only the link.
+  const secret = hide ? JSON.stringify({ name, description, url, icon: $("icon").value }) : url;
+  const code = await Vault.lock(secret, pw);
   const check = await Vault.unlock(code, pw); // make sure it opens again before showing it
   $("make").disabled = false;
   $("make").textContent = "Make locked entry";
-  if (check !== url) return (error.textContent = "Something went wrong. Please try again.");
+  if (check !== secret) return (error.textContent = "Something went wrong. Please try again.");
 
-  const entry = { name, description: $("desc").value.trim() || undefined, icon: $("icon").value, locked: code };
+  const entry = hide ? { hidden: code } : { name, description, icon: $("icon").value, locked: code };
   const lines = Object.entries(entry)
     .filter(([, v]) => v !== undefined)
     .map(([k, v]) => `  ${k}: ${JSON.stringify(v)},`);
