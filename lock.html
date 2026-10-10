@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Lock a Link</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="style.css">
+<script src="shared.js"></script>
+</head>
+<body>
+<main class="wrap narrow">
+  <header class="masthead">
+    <a class="back" href="./">&larr; Back to dashboard</a>
+    <h1>Lock a link</h1>
+    <p class="sub">Turns a link into a code that only opens with a password. Everything happens in this browser; nothing is sent anywhere.</p>
+  </header>
+
+  <form id="form" class="panel" novalidate>
+    <div class="field">
+      <label for="name">Name</label>
+      <input id="name" required placeholder="e.g. Budget Planner">
+    </div>
+    <div class="field">
+      <label for="desc">Description <span class="opt">optional</span></label>
+      <input id="desc" placeholder="One short line">
+    </div>
+    <div class="field">
+      <label for="url">Link</label>
+      <input id="url" type="url" required placeholder="https://">
+    </div>
+    <div class="field">
+      <label for="icon">Icon</label>
+      <select id="icon"></select>
+    </div>
+    <div class="field">
+      <label for="pw">Password</label>
+      <input id="pw" type="password" required autocomplete="new-password">
+    </div>
+    <div class="field">
+      <label for="pw2">Repeat password</label>
+      <input id="pw2" type="password" required autocomplete="new-password">
+    </div>
+    <p class="sub" style="font-size:13px">Tip: give several sites the same password and one entry unlocks them all.</p>
+    <p class="error" id="error" role="alert"></p>
+    <button type="submit" class="btn" id="make">Make locked entry</button>
+  </form>
+
+  <section id="out" class="panel" hidden>
+    <h2>Paste this into sites.js</h2>
+    <p class="sub">Add it inside the <code>sites: [ … ]</code> list, then publish the change.</p>
+    <pre><code id="snippet"></code></pre>
+    <button type="button" class="btn secondary" id="copy">Copy</button>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+for (const name of Object.keys(ICON_COLORS)) {
+  $("icon").add(new Option(name[0].toUpperCase() + name.slice(1), name, name === "lock", name === "lock"));
+}
+
+$("form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const error = $("error");
+  const name = $("name").value.trim();
+  const url = $("url").value.trim();
+  const pw = $("pw").value;
+  error.textContent = "";
+
+  if (!name) return (error.textContent = "Give the site a name.");
+  try {
+    if (!/^https?:$/.test(new URL(url).protocol)) throw 0;
+  } catch {
+    return (error.textContent = "Enter the full link, starting with https://");
+  }
+  if (pw.length < 8) return (error.textContent = "Use a password of at least 8 characters.");
+  if (pw !== $("pw2").value) return (error.textContent = "The two passwords don't match.");
+
+  $("make").disabled = true;
+  $("make").textContent = "Locking…";
+  const code = await Vault.lock(url, pw);
+  const check = await Vault.unlock(code, pw); // make sure it opens again before showing it
+  $("make").disabled = false;
+  $("make").textContent = "Make locked entry";
+  if (check !== url) return (error.textContent = "Something went wrong. Please try again.");
+
+  const entry = { name, description: $("desc").value.trim() || undefined, icon: $("icon").value, locked: code };
+  const lines = Object.entries(entry)
+    .filter(([, v]) => v !== undefined)
+    .map(([k, v]) => `  ${k}: ${JSON.stringify(v)},`);
+  $("snippet").textContent = `{\n${lines.join("\n")}\n},`;
+  $("out").hidden = false;
+  $("out").scrollIntoView({ behavior: "smooth", block: "start" });
+});
+
+$("copy").addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText($("snippet").textContent);
+    $("copy").textContent = "Copied";
+  } catch {
+    $("copy").textContent = "Select the text above to copy";
+  }
+  setTimeout(() => ($("copy").textContent = "Copy"), 2000);
+});
+</script>
+</body>
+</html>

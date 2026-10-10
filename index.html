@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Launchpad</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231b1a17'/%3E%3Crect x='8' y='8' width='7' height='7' rx='2' fill='%234fd1b0'/%3E%3Crect x='17' y='8' width='7' height='7' rx='2' fill='%23fff'/%3E%3Crect x='8' y='17' width='7' height='7' rx='2' fill='%23fff'/%3E%3Crect x='17' y='17' width='7' height='7' rx='2' fill='%237aa7ff'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="style.css">
+<script src="sites.js"></script>
+<script src="shared.js"></script>
+</head>
+<body>
+<main class="wrap">
+  <header class="masthead">
+    <h1 id="title">Launchpad</h1>
+    <p class="sub" id="subtitle"></p>
+  </header>
+  <ul class="grid" id="grid"></ul>
+  <noscript><p class="sub">This page needs JavaScript to show its links.</p></noscript>
+</main>
+
+<dialog id="unlock" aria-labelledby="unlock-title">
+  <form id="unlock-form">
+    <div class="dialog-icon"></div>
+    <h2 id="unlock-title"></h2>
+    <p class="sub">Enter the password to open this site.</p>
+    <label for="unlock-pw">Password</label>
+    <input id="unlock-pw" type="password" autocomplete="current-password" required>
+    <p class="error" id="unlock-error" role="alert"></p>
+    <div class="actions">
+      <button type="button" class="btn secondary" id="unlock-cancel">Cancel</button>
+      <button type="submit" class="btn" id="unlock-submit">Unlock</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+const cfg = Object.assign({ title: "Launchpad", subtitle: "", newTab: true, sites: [] }, window.DASHBOARD);
+const $ = (id) => document.getElementById(id);
+const dialog = $("unlock");
+let pending = null; // the locked site whose password dialog is open
+
+document.title = cfg.title;
+$("title").textContent = cfg.title;
+$("subtitle").textContent = cfg.subtitle;
+document.querySelector(".dialog-icon").innerHTML = icon("lock");
+
+function shortUrl(url) {
+  try {
+    const u = new URL(url, location.href);
+    return (u.host + u.pathname).replace(/\/$/, "");
+  } catch {
+    return url;
+  }
+}
+
+function cardFor(site) {
+  const locked = Boolean(site.locked && !site.url);
+  const card = document.createElement(locked ? "button" : "a");
+  const color = site.color || ICON_COLORS[site.icon] || "slate";
+  card.className = "card";
+  card.style.setProperty("--tint", `var(--${color})`);
+  card.style.setProperty("--tint-bg", `var(--${color}-bg)`);
+
+  if (locked) {
+    card.type = "button";
+    card.addEventListener("click", () => askPassword(site));
+  } else {
+    card.href = site.url;
+    if (cfg.newTab) {
+      card.target = "_blank";
+      card.rel = "noopener";
+    }
+  }
+
+  card.innerHTML = `
+    <span class="icon">${icon(site.icon)}</span>
+    ${site.locked ? `<span class="badge">${icon(locked ? "lock" : "unlock")}${locked ? "Locked" : "Unlocked"}</span>` : ""}
+    <span><span class="name"></span><span class="desc"></span></span>
+    <span class="foot"><span class="path"></span>${icon(locked ? "lock" : "arrow")}</span>`;
+  card.querySelector(".name").textContent = site.name;
+  card.querySelector(".desc").textContent = site.description || "";
+  card.querySelector(".path").textContent = locked ? "Password required" : shortUrl(site.url);
+  return card;
+}
+
+function render() {
+  $("grid").replaceChildren(...cfg.sites.map((site) => {
+    const li = document.createElement("li");
+    li.append(cardFor(site));
+    return li;
+  }));
+}
+
+function askPassword(site) {
+  pending = site;
+  $("unlock-title").textContent = site.name;
+  $("unlock-error").textContent = "";
+  $("unlock-pw").value = "";
+  dialog.showModal();
+}
+
+function go(url) {
+  if (!cfg.newTab) return location.assign(url);
+  const w = window.open(url, "_blank");
+  if (w) w.opener = null;
+  else location.assign(url); // pop-up blocked: open here instead
+}
+
+// A password that opens one site also unlocks any other site that shares it.
+async function unlockAll(password) {
+  for (const site of cfg.sites) {
+    if (site.locked && !site.url) {
+      const url = await Vault.unlock(site.locked, password).catch(() => null);
+      if (url) site.url = url;
+    }
+  }
+  render();
+}
+
+$("unlock-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const password = $("unlock-pw").value;
+  const submit = $("unlock-submit");
+  if (!password || !pending) return;
+
+  submit.disabled = true;
+  submit.textContent = "Checking…";
+  const url = await Vault.unlock(pending.locked, password).catch(() => null);
+  submit.disabled = false;
+  submit.textContent = "Unlock";
+
+  if (!url) {
+    $("unlock-error").textContent = "That password didn't work. Try again.";
+    const form = $("unlock-form");
+    form.classList.remove("shake");
+    void form.offsetWidth;
+    form.classList.add("shake");
+    $("unlock-pw").select();
+    return;
+  }
+
+  pending.url = url;
+  pending = null;
+  dialog.close();
+  go(url);
+  unlockAll(password);
+});
+
+$("unlock-cancel").addEventListener("click", () => dialog.close());
+dialog.addEventListener("click", (e) => { if (e.target === dialog) dialog.close(); });
+dialog.addEventListener("close", () => { pending = null; });
+
+render();
+</script>
+</body>
+</html>
