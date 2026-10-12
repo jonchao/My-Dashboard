@@ -24,5 +24,12 @@ window.DASHBOARD = {
       url: "https://jonchao.github.io/travel-tracker/",
       icon: "plane",
     },
+    {
+      name: "Trip Ranker",
+      description: "Add trips from Wanderlog and vote on where to go next.",
+      url: "https://jonchao.github.io/trip-ranker/",
+      icon: "chart",
+      color: "violet",
+    },
   ],
 };
