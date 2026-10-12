@@ -25,7 +25,7 @@ window.DASHBOARD = {
       icon: "plane",
     },
     {
-      name: "Trip Ranker",
+      name: "POI Planner",
       description: "Add trips from Wanderlog and vote on where to go next.",
       url: "https://jonchao.github.io/trip-ranker/",
       icon: "chart",
