@@ -20,7 +20,7 @@ window.DASHBOARD = {
     },
     {
       name: "Travel Tracker",
-      description: "See and add travel plans for the wedding.",
+      description: "See and add travel plans for yourself and friends.",
       url: "https://jonchao.github.io/travel-tracker/",
       icon: "plane",
     },
